@@ -1,10 +1,33 @@
 """Load the project settings from ``config.toml``."""
 
+import re
 import tomllib
 from dataclasses import dataclass
+from urllib.parse import parse_qs, urlsplit
 lazy from pathlib import Path
 
 from .description import Template
+
+_PLAYLIST_ID_RE = re.compile(r"[A-Za-z0-9_-]{10,}")
+
+
+def parse_playlist_id(value: str) -> str:
+    """Return the playlist ID from a bare ID or any YouTube URL with a ``list=`` parameter.
+
+    Raises ``ValueError`` when no valid-looking playlist ID can be found.
+    """
+    value = value.strip()
+    if "youtube.com" in value or "youtu.be" in value or "://" in value:
+        url = value if "://" in value else f"https://{value}"
+        ids = parse_qs(urlsplit(url).query).get("list")
+        if not ids:
+            msg = f"no playlist ID ('list=...') in URL: {value}"
+            raise ValueError(msg)
+        value = ids[0]
+    if not _PLAYLIST_ID_RE.fullmatch(value):
+        msg = f"not a YouTube playlist ID: {value!r}"
+        raise ValueError(msg)
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +58,7 @@ def load_config(path: Path) -> Config:
         raise ValueError(msg)
 
     return Config(
-        playlist_id=data["playlist_id"],
+        playlist_id=parse_playlist_id(data["playlist_id"]),
         template=Template(
             start_heading=data["start_heading"],
             end_heading=data["end_heading"],

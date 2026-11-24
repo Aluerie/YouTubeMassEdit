@@ -56,6 +56,13 @@ uv run youtube-mass-edit restore backups/2026-11-23_163000.json
 uv run youtube-mass-edit restore backups/2026-11-23_163000.json --apply
 ```
 
+Only videos in the playlist are ever changed, and `restore` skips backed-up videos that are no longer in
+it. To work on a different playlist than the one in `config.toml`, pass its ID or URL before the command:
+
+```sh
+uv run youtube-mass-edit --playlist "https://www.youtube.com/playlist?list=PL..." update
+```
+
 ## 💡 Good to know
 
 - **The headings are the markers.** Videos where either heading can't be found are listed as
