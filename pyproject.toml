@@ -2,6 +2,7 @@
 name = "youtube-mass-edit"
 version = "0.1.0"
 description = "Mass-edit the shared parts of YouTube video descriptions in a playlist"
+license = "MIT"
 authors = [
     { name = "Aluerie", email = "aluerie@gmail.com" }
 ]
