@@ -1,0 +1,16 @@
+# Python / uv
+__pycache__/
+*.py[oc]
+build/
+dist/
+*.egg-info
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Google credentials and login: never commit these
+client_secret*.json
+token.json
+
+# Original descriptions saved before each --apply run
+backups/

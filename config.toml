@@ -1,0 +1,24 @@
+# Settings for `uv run youtube-mass-edit`. Relative paths are resolved against this file's folder.
+
+# The playlist whose videos get updated.
+playlist_id = "PL7xvidZnZQmTIOls7jzWSdj2CBu2aiDCT"
+
+# The shared block runs from the heading containing `start_heading` up to, but not including,
+# the heading containing `end_heading`. Headings are lines starting with "#". The emoji can
+# change freely; only these words have to stay in every video you want updated.
+start_heading = "Chosen Playlist Restrictions"
+end_heading = "Timestamps"
+
+# The text that replaces the shared block in every video.
+shared_file = "for_editing/shared.md"
+
+# Replaces the hashtag line at the very end of each description. "" removes it.
+hashtags = "#hitless #sekiro"
+
+# Hidden video tags (the ones set in Studio). Uncomment to replace them on every video;
+# leave commented out to keep each video's tags as they are.
+# tags = ["sekiro", "hitless"]
+
+# client_secret_file = "client_secret.json"
+# token_file = "token.json"
+# backup_dir = "backups"
