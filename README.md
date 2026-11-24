@@ -1,4 +1,4 @@
-# 🎥 YouTube Mass Edit
+# 📝 YouTube Mass Edit
 
 Replaces the shared parts of every video description in a playlist, leaving each video's own intro
 and timestamps alone.
