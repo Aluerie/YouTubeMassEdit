@@ -1,0 +1,7 @@
+// Files here are YouTube description text, not real Markdown: lint fixes (list markers,
+// blank lines around headings, ...) would change what gets published, so every rule is off.
+{
+  "config": {
+    "default": false
+  }
+}
