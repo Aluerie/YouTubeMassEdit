@@ -1,24 +1,31 @@
 # Settings for `uv run youtube-mass-edit`. Relative paths are resolved against this file's folder.
 
-# The playlist whose videos get updated.
-playlist_id = "PL7xvidZnZQmTIOls7jzWSdj2CBu2aiDCT"
-
 # The shared block runs from the heading containing `start_heading` up to, but not including,
 # the heading containing `end_heading`. Headings are lines starting with "#". The emoji can
 # change freely; only these words have to stay in every video you want updated.
+# A playlist below can set its own `start_heading` / `end_heading` to override these.
 start_heading = "Chosen Playlist Restrictions"
 end_heading = "Timestamps"
-
-# The text that replaces the shared block in every video.
-shared_file = "for_editing/shared.md"
-
-# Replaces the hashtag line at the very end of each description. "" removes it.
-hashtags = "#hitless #sekiro"
-
-# Hidden video tags (the ones set in Studio). Uncomment to replace them on every video;
-# leave commented out to keep each video's tags as they are.
-# tags = ["sekiro", "hitless"]
 
 # client_secret_file = "client_secret.json"
 # token_file = "token.json"
 # backup_dir = "backups"
+
+# One table per playlist; the name after "playlists." is what you type in the command,
+# e.g. `uv run youtube-mass-edit update sekiro`.
+#   playlist    - playlist ID or URL; only videos in it are ever changed
+#   shared_file - the text that replaces the shared block in every video
+#   hashtags    - replaces the hashtag line at the very end of each description ("" removes it)
+#   tags        - optional: hidden video tags (set in Studio) to put on every video;
+#                 leave it out to keep each video's tags as they are
+
+[playlists.sekiro]
+playlist = "https://www.youtube.com/playlist?list=PL7xvidZnZQmTIOls7jzWSdj2CBu2aiDCT"
+shared_file = "for_editing/sekiro.md"
+hashtags = "#hitless #sekiro"
+# tags = ["sekiro", "hitless"]
+
+[playlists.elden_ring]
+playlist = "PLbUO2EBIhGFQ"
+shared_file = "for_editing/elden_ring.md"
+hashtags = "#hitless #eldenring"

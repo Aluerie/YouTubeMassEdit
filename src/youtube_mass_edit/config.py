@@ -32,8 +32,9 @@ def parse_playlist_id(value: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class Config:
-    """Settings for one mass-edit run, with every path already resolved."""
+    """Settings for one run on one named playlist, with every path already resolved."""
 
+    name: str
     playlist_id: str
     template: Template
     tags: list[str] | None
@@ -42,28 +43,44 @@ class Config:
     backup_dir: Path
 
 
-def load_config(path: Path) -> Config:
-    """Read ``path`` and the shared-block file it points to.
+def _read_toml(path: Path) -> dict:
+    with path.open("rb") as f:
+        return tomllib.load(f)
 
-    Relative paths inside the file are resolved against the directory that holds it.
+
+def load_config(path: Path, name: str) -> Config:
+    """Read the settings for the playlist called ``name`` from ``path``, plus its shared-block file.
+
+    Top-level settings apply to every playlist; a playlist's own table can override
+    ``start_heading`` and ``end_heading``. Relative paths are resolved against the directory that
+    holds ``path``. Raises ``ValueError`` for an unknown name or invalid settings.
     """
     root = path.parent
-    with path.open("rb") as f:
-        data = tomllib.load(f)
+    data = _read_toml(path)
+    playlists = data.get("playlists", {})
+    if name not in playlists:
+        known = ", ".join(playlists) or "none"
+        msg = f"no playlist called {name!r} in {path} (set up: {known})"
+        raise ValueError(msg)
+    entry = playlists[name]
+    for key in ("playlist", "shared_file"):
+        if key not in entry:
+            msg = f"{path}: playlist {name!r} is missing {key!r}"
+            raise ValueError(msg)
 
-    shared_block = (root / data.get("shared_file", "for_editing/shared.md")).read_text(encoding="utf-8")
-    tags = data.get("tags")
+    tags = entry.get("tags")
     if tags is not None and not (isinstance(tags, list) and all(isinstance(t, str) for t in tags)):
-        msg = f"{path}: 'tags' must be a list of strings"
+        msg = f"{path}: 'tags' of playlist {name!r} must be a list of strings"
         raise ValueError(msg)
 
     return Config(
-        playlist_id=parse_playlist_id(data["playlist_id"]),
+        name=name,
+        playlist_id=parse_playlist_id(entry["playlist"]),
         template=Template(
-            start_heading=data["start_heading"],
-            end_heading=data["end_heading"],
-            shared_block=shared_block,
-            hashtags=data.get("hashtags", ""),
+            start_heading=entry.get("start_heading", data["start_heading"]),
+            end_heading=entry.get("end_heading", data["end_heading"]),
+            shared_block=(root / entry["shared_file"]).read_text(encoding="utf-8"),
+            hashtags=entry.get("hashtags", ""),
         ),
         tags=tags,
         client_secret_file=root / data.get("client_secret_file", "client_secret.json"),

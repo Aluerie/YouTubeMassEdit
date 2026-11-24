@@ -31,10 +31,10 @@ def test_parse_playlist_id_rejects(value: str) -> None:
         parse_playlist_id(value)
 
 
-def test_cli_rejects_bad_playlist_before_connecting() -> None:
-    result = CliRunner().invoke(cli, ["--playlist", "https://www.youtube.com/watch?v=x", "update"])
-    assert result.exit_code == 2
-    assert "no playlist ID" in result.output
+def test_cli_rejects_unknown_playlist_before_connecting() -> None:
+    result = CliRunner().invoke(cli, ["update", "dark_souls"])
+    assert result.exit_code == 1
+    assert "no playlist called 'dark_souls'" in result.output
 
 
 def test_cli_help_lists_commands() -> None:

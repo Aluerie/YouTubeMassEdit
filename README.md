@@ -1,19 +1,19 @@
 # 📝 YouTube Mass Edit
 
 Replaces the shared parts of every video description in a playlist, leaving each video's own intro
-and timestamps alone.
+and timestamps alone. Each playlist (Sekiro, Elden Ring, ...) has its own shared text and hashtags.
 
 A description is expected to look like this:
 
 ```text
 [unique intro]
 # 😘Chosen Playlist Restrictions   ┐
-...                                │ replaced with for_editing/shared.md
+...                                │ replaced with for_editing/<name>.md
 # 🤔Extra                          │
 ...                                ┘
 # ⏰Timestamps                      ← kept
 ...
-#hitless #sekiro                   ← replaced with `hashtags` from config.toml
+#hitless #sekiro                   ← replaced with the playlist's `hashtags`
 ```
 
 ## 🔑 One-time setup
@@ -35,41 +35,45 @@ for your own test app. The login is saved to `token.json`, so later runs don't a
 
 ## 🚀 Usage
 
-1. Edit `for_editing/shared.md` (the shared block) and `config.toml` (playlist, hashtags, optional video tags).
+Each playlist is a `[playlists.<name>]` table in `config.toml` with its link, its shared-text file in
+`for_editing/` and its hashtags. The name is what you type in the commands, e.g. `sekiro` or
+`elden_ring`. To add a playlist, copy a table, give it a new name and point it at a new `.md` file.
+
+1. Edit the playlist's file in `for_editing/` (the shared block), and its hashtags in `config.toml`.
 2. Preview. Nothing is saved, and each video's diff is printed (`-` removed, `+` added):
 
    ```sh
-   uv run youtube-mass-edit update
+   uv run youtube-mass-edit update sekiro
    ```
 
 3. If only the shared sections show up in the diffs, save the changes:
 
    ```sh
-   uv run youtube-mass-edit update --apply
+   uv run youtube-mass-edit update sekiro --apply
    ```
 
 Before saving, the original snippets of the videos being changed are written to
-`backups/<date>_<time>.json`. To undo a run, preview and then apply a restore:
+`backups/<name>_<date>_<time>.json`. To undo a run, preview and then apply a restore:
 
 ```sh
-uv run youtube-mass-edit restore backups/2026-11-23_163000.json
-uv run youtube-mass-edit restore backups/2026-11-23_163000.json --apply
+uv run youtube-mass-edit restore sekiro backups/sekiro_2026-11-23_163000.json
 ```
-
-Only videos in the playlist are ever changed, and `restore` skips backed-up videos that are no longer in
-it. To work on a different playlist than the one in `config.toml`, pass its ID or URL before the command:
 
 ```sh
-uv run youtube-mass-edit --playlist "https://www.youtube.com/playlist?list=PL..." update
+uv run youtube-mass-edit restore sekiro backups/sekiro_2026-11-23_163000.json --apply
 ```
+
+Only videos in the named playlist are ever changed, and `restore` skips backed-up videos that aren't in
+it.
 
 ## 💡 Good to know
 
 - **The headings are the markers.** Videos where either heading can't be found are listed as
   `skipped` and left unchanged. The emoji in a heading can change; only the words set in
   `config.toml` have to stay.
-- **Renaming a heading:** put the new heading in `for_editing/shared.md`, run once with the *old* words in
-  `start_heading` / `end_heading`, then switch `config.toml` to the new words.
+- **Renaming a heading:** put the new heading in the playlist's `.md` file, run once with the *old* words in
+  `start_heading` / `end_heading`, then switch `config.toml` to the new words. A playlist can set its
+  own `start_heading` / `end_heading` if its headings differ from the others.
 - **Daily quota:** each saved video costs 50 of the 10,000 free daily units, so about 190 videos a day.
   If the quota runs out, the tool stops. Run the same command the next day; videos already up to date
   are skipped.

@@ -1,10 +1,10 @@
 """Command-line entry point: preview, apply and undo description changes across a playlist."""
 
-import dataclasses
 import difflib
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,7 +12,7 @@ import click
 from googleapiclient.errors import HttpError
 
 from . import youtube
-from .config import Config, load_config, parse_playlist_id
+from .config import Config, load_config
 from .description import validation_errors
 
 if TYPE_CHECKING:
@@ -58,15 +58,15 @@ def _is_noop(change: Change) -> bool:
     return same_description and same_tags
 
 
-def _write_backup(videos: list[Video], backup_dir: Path) -> Path:
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    path = backup_dir / f"{datetime.now():%Y-%m-%d_%H%M%S}.json"
+def _write_backup(videos: list[Video], config: Config) -> Path:
+    config.backup_dir.mkdir(parents=True, exist_ok=True)
+    path = config.backup_dir / f"{config.name}_{datetime.now():%Y-%m-%d_%H%M%S}.json"
     data = {v["id"]: v["snippet"] for v in videos}
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 
-def _run(yt: YouTubeResource, changes: list[Change], *, apply: bool, backup_dir: Path) -> int:
+def _run(yt: YouTubeResource, changes: list[Change], *, apply: bool, config: Config) -> int:
     """Show every change and, with ``apply``, save them. Returns the process exit code."""
     changes = [c for c in changes if not _is_noop(c)]
     if not changes:
@@ -88,7 +88,7 @@ def _run(yt: YouTubeResource, changes: list[Change], *, apply: bool, backup_dir:
         click.echo("Run again with --apply to save.")
         return 1 if invalid else 0
 
-    backup = _write_backup([c.video for c in valid], backup_dir)
+    backup = _write_backup([c.video for c in valid], config)
     click.echo(f"\nBacked up {len(valid)} original snippet(s) to {backup}")
 
     for done, change in enumerate(valid):
@@ -120,20 +120,29 @@ def _connect(config: Config) -> YouTubeResource:
 
 
 def _playlist_videos(yt: YouTubeResource, config: Config) -> list[Video]:
-    videos = youtube.fetch_videos(yt, youtube.playlist_video_ids(yt, config.playlist_id))
-    click.echo(f"Found {len(videos)} video(s) in playlist {config.playlist_id}.")
+    try:
+        ids = youtube.playlist_video_ids(yt, config.playlist_id)
+    except HttpError as e:
+        if e.status_code == HTTPStatus.NOT_FOUND:
+            msg = (
+                f"playlist {config.playlist_id!r} ({config.name}) not found. Check the link in "
+                "config.toml, and that you logged in with the channel that owns it."
+            )
+            raise click.ClickException(msg) from e
+        raise
+    videos = youtube.fetch_videos(yt, ids)
+    click.echo(f"Found {len(videos)} video(s) in playlist {config.name} ({config.playlist_id}).")
     return videos
 
 
-def _parse_playlist(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
-    if value is None:
-        return None
+def _load(config_path: Path, name: str) -> Config:
     try:
-        return parse_playlist_id(value)
+        return load_config(config_path, name)
     except ValueError as e:
-        raise click.BadParameter(str(e)) from e
+        raise click.ClickException(str(e)) from e
 
 
+name_argument = click.argument("name")
 apply_option = click.option("--apply", is_flag=True, help="Save the changes. Without it, only a preview.")
 
 
@@ -146,31 +155,23 @@ apply_option = click.option("--apply", is_flag=True, help="Save the changes. Wit
     show_default=True,
     help="Settings file.",
 )
-@click.option(
-    "--playlist",
-    callback=_parse_playlist,
-    help="Playlist ID or URL to work on, instead of the one in the settings file.",
-)
 @click.pass_context
-def cli(ctx: click.Context, config_path: Path, playlist: str | None) -> None:
+def cli(ctx: click.Context, config_path: Path) -> None:
     """Replace the shared sections of every video description in a YouTube playlist.
 
-    Only videos in the playlist are ever changed.
+    NAME is a playlist set up in the settings file as [playlists.NAME]. Only videos in that
+    playlist are ever changed.
     """
-    try:
-        config = load_config(config_path)
-    except ValueError as e:
-        raise click.ClickException(str(e)) from e
-    if playlist is not None:
-        config = dataclasses.replace(config, playlist_id=playlist)
-    ctx.obj = config
+    ctx.obj = config_path
 
 
 @cli.command()
+@name_argument
 @apply_option
 @click.pass_obj
-def update(config: Config, *, apply: bool) -> None:
-    """Put the shared block and hashtags into every video in the playlist."""
+def update(config_path: Path, name: str, *, apply: bool) -> None:
+    """Put NAME's shared block and hashtags into every video in that playlist."""
+    config = _load(config_path, name)
     yt = _connect(config)
     changes: list[Change] = []
     for video in _playlist_videos(yt, config):
@@ -180,15 +181,17 @@ def update(config: Config, *, apply: bool) -> None:
             continue
         changes.append(Change(video, new_description, config.tags))
 
-    raise SystemExit(_run(yt, changes, apply=apply, backup_dir=config.backup_dir))
+    raise SystemExit(_run(yt, changes, apply=apply, config=config))
 
 
 @cli.command()
+@name_argument
 @click.argument("backup", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @apply_option
 @click.pass_obj
-def restore(config: Config, backup: Path, *, apply: bool) -> None:
-    """Put descriptions and tags back from a BACKUP file, for videos in the playlist only."""
+def restore(config_path: Path, name: str, backup: Path, *, apply: bool) -> None:
+    """Put descriptions and tags back from a BACKUP file, for videos in playlist NAME only."""
+    config = _load(config_path, name)
     saved = json.loads(backup.read_text(encoding="utf-8"))
     yt = _connect(config)
     videos = [v for v in _playlist_videos(yt, config) if v["id"] in saved]
@@ -196,9 +199,9 @@ def restore(config: Config, backup: Path, *, apply: bool) -> None:
     outside = set(saved) - {v["id"] for v in videos}
     for video_id in sorted(outside):
         title = saved[video_id].get("title", video_id)
-        click.secho(f"skipped (not in playlist {config.playlist_id}): {title}", fg="yellow")
+        click.secho(f"skipped (not in playlist {config.name}): {title}", fg="yellow")
 
     changes = [
         Change(v, saved[v["id"]].get("description", ""), saved[v["id"]].get("tags", [])) for v in videos
     ]
-    raise SystemExit(_run(yt, changes, apply=apply, backup_dir=config.backup_dir))
+    raise SystemExit(_run(yt, changes, apply=apply, config=config))
